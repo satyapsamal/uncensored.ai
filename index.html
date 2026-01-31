@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age Verification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+        }
+
+        /* Fluid Pastel Rainbow Animation */
+        @keyframes fluid-spin {
+            0% { transform: rotate(0deg) scale(1.5); }
+            50% { transform: rotate(180deg) scale(1.8); }
+            100% { transform: rotate(360deg) scale(1.5); }
+        }
+
+        .rainbow-loader {
+            background: conic-gradient(
+                from 0deg,
+                #ffadad, /* Pastel Red */
+                #ffd6a5, /* Pastel Orange */
+                #fdffb6, /* Pastel Yellow */
+                #caffbf, /* Pastel Green */
+                #9bf6ff, /* Pastel Blue */
+                #a0c4ff, /* Pastel Indigo */
+                #bdb2ff, /* Pastel Purple */
+                #ffc6ff, /* Pastel Pink */
+                #ffadad  /* Loop back to Red */
+            );
+            filter: blur(25px);
+            animation: fluid-spin 4s linear infinite;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .verifying .rainbow-loader {
+            opacity: 0.8; 
+        }
+
+        .verifying video {
+            filter: blur(15px) grayscale(50%);
+            transition: filter 0.5s ease;
+        }
+
+        /* Pulse effect for the scanner ring */
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(160, 196, 255, 0.4); }
+            70% { box-shadow: 0 0 0 20px rgba(160, 196, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(160, 196, 255, 0); }
+        }
+
+        .camera-container.active::after {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid #a0c4ff;
+            animation: pulse-ring 2s infinite;
+            pointer-events: none;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+
+    <!-- Header Section -->
+    <header class="mb-8 max-w-md mx-auto">
+        <div class="inline-flex items-center justify-center w-12 h-12 mb-4 bg-gray-50 rounded-full">
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+            </svg>
+        </div>
+        <h1 class="text-xl font-semibold text-gray-900 mb-2">Identity Check</h1>
+        <p class="text-gray-500 text-sm">Please verify your age using AI-powered facial verification.</p>
+    </header>
+
+    <!-- Camera Interface -->
+    <div class="relative mb-8 group">
+        <!-- Circular Frame -->
+        <div id="camera-frame" class="relative w-64 h-64 rounded-full overflow-hidden bg-gray-100 ring-4 ring-gray-50 shadow-xl transition-all duration-500">
+            
+            <!-- Webcam Feed -->
+            <video id="webcam" class="w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
+            
+            <!-- Fluid Rainbow Overlay (Hidden by default) -->
+            <div id="rainbow-overlay" class="absolute inset-[-50%] w-[200%] h-[200%] rainbow-loader pointer-events-none"></div>
+
+            <!-- Fallback Icon if camera fails -->
+            <div id="camera-placeholder" class="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+                <span class="text-gray-400 text-sm">Allow camera access</span>
+            </div>
+        </div>
+        
+        <!-- Status Badge -->
+        <div id="status-badge" class="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-white px-4 py-1.5 rounded-full shadow-md border border-gray-100 flex items-center gap-2 opacity-0 transition-opacity duration-300">
+            <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+            <span class="text-xs font-medium text-gray-600" id="status-text">Analyzing facial features...</span>
+        </div>
+    </div>
+
+    <!-- Actions Area -->
+    <div class="w-full max-w-xs space-y-4">
+        <!-- Verify Button -->
+        <button id="verify-btn" disabled class="w-full bg-black text-white font-medium py-3.5 px-4 rounded-xl shadow-lg shadow-gray-200/50 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
+            Verify Age
+        </button>
+
+        <!-- Result Message (Hidden initially) -->
+        <div id="result-message" class="hidden p-4 bg-red-50 border border-red-100 rounded-xl text-left animate-[fadeIn_0.5s_ease-out]">
+            <div class="flex gap-3">
+                <div class="flex-shrink-0 mt-0.5">
+                    <svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-red-800">Verification Failed</h3>
+                    <p class="mt-1 text-sm text-red-600 leading-relaxed">
+                        Age verification failed. Access is restricted to users aged 18 and above.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Note -->
+    <p class="mt-8 text-xs text-gray-400">
+        Processed locally. No biometric data is stored.
+    </p>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const verifyBtn = document.getElementById('verify-btn');
+        const cameraFrame = document.getElementById('camera-frame');
+        const cameraPlaceholder = document.getElementById('camera-placeholder');
+        const rainbowOverlay = document.getElementById('rainbow-overlay');
+        const statusBadge = document.getElementById('status-badge');
+        const resultMessage = document.getElementById('result-message');
+        const cameraContainer = document.querySelector('.camera-container');
+
+        // 1. Initialize Webcam
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 640 },
+                        facingMode: "user" 
+                    } 
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    cameraPlaceholder.style.display = 'none';
+                    verifyBtn.disabled = false;
+                    verifyBtn.classList.add('camera-ready');
+                    cameraFrame.classList.add('active'); // Adds the subtle ring pulse
+                };
+            } catch (err) {
+                console.error("Camera access denied:", err);
+                cameraPlaceholder.innerHTML = '<span class="text-red-500 text-sm px-4">Camera access required</span>';
+            }
+        }
+
+        // 2. Handle Verification Logic
+        verifyBtn.addEventListener('click', () => {
+            // UI State: Verifying
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = 'Verifying...';
+            cameraFrame.classList.add('verifying'); // Triggers blur
+            statusBadge.classList.remove('opacity-0'); // Show "Analyzing..." badge
+            resultMessage.classList.add('hidden'); // Hide previous results if any
+
+            // Wait 5 seconds
+            setTimeout(() => {
+                // UI State: Failed
+                cameraFrame.classList.remove('verifying');
+                statusBadge.classList.add('opacity-0');
+                verifyBtn.classList.add('hidden'); // Hide button
+                resultMessage.classList.remove('hidden'); // Show error
+                
+                // Optional: Stop the camera stream to indicate "Lockout"
+                const stream = video.srcObject;
+                if(stream) {
+                    const tracks = stream.getTracks();
+                    tracks.forEach(track => track.stop());
+                    video.srcObject = null;
+                    // Freeze the last frame feel (or just show placeholder)
+                    cameraPlaceholder.style.display = 'flex';
+                    cameraPlaceholder.innerHTML = '<span class="text-gray-400 text-sm">Session Ended</span>';
+                }
+
+            }, 5000);
+        });
+
+        // Start camera on load
+        window.addEventListener('load', initCamera);
+
+    </script>
+</body>
+</html>
